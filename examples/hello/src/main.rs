@@ -29,11 +29,12 @@ fn main() {
             let libevent_ref = libevent.inner();
             let new_duration = if let Some(duration) = maybe_duration {
                 let now = std::time::Instant::now();
-                libevent_ref.run_timeout(duration);
+                //libevent_ref.run_timeout(duration);
+                libevent_ref.run_until_event(Some(duration));
 
-                let elapsed = now.elapsed();
-                duration.checked_sub(elapsed).unwrap_or(Duration::from_secs(0))
-                //Duration::from_secs(0)
+                //let elapsed = now.elapsed();
+                //duration.checked_sub(elapsed).unwrap_or(Duration::from_secs(0))
+                Duration::from_secs(0)
             } else {
                 libevent_ref.run_timeout(Duration::from_secs(1));
 

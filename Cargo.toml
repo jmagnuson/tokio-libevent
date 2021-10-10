@@ -16,13 +16,14 @@ mio = "0.6"
 #tokio-io = "0.1"
 #tokio-reactor = "0.1"
 #libevent = { git = "https://github.com/jmagnuson/libevent-rs", branch = "hacking" }
-libevent = { path = "../libevent-rs" }
+#libevent = { path = "../libevent-rs" }
+libevent = "0.1.0"
 
 [dependencies.tokio]
 # path = "../tokio"
 # version = "0.2"
 git = "https://github.com/jmagnuson/tokio"
-branch = "feature/park-shim"
+branch = "park-shim_0.3.4"
 default-features = false
 features = [ "full" ]
 

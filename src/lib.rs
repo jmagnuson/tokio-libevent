@@ -7,14 +7,14 @@ use libevent_sys;
 use libc::c_int;
 
 //use tokio::runtime::current_thread::Runtime;
-use tokio::io::PollEvented;
+use tokio::io::unix::AsyncFd;
 use tokio::time::timeout as tokio_timeout;
 
 //use futures::try_ready;
 use futures::ready;
 use futures::future::poll_fn;
 
-use std::os::unix::io::RawFd;
+use std::os::unix::io::{AsRawFd,RawFd};
 use mio::Ready;
 use mio::unix::EventedFd;
 use mio::Evented;
@@ -37,6 +37,7 @@ pub struct EventLoopFd {
     pub fd: RawFd,
 }
 
+/*
 impl Evented for EventLoopFd {
     fn register(&self, poll: &mio::Poll, token: mio::Token, interest: Ready, opts: mio::PollOpt)
                 -> io::Result<()>
@@ -54,6 +55,7 @@ impl Evented for EventLoopFd {
         EventedFd(&self.fd).deregister(poll)
     }
 }
+*/
 
 impl EventLoopFd {
     fn poll(
@@ -63,9 +65,9 @@ impl EventLoopFd {
     ) -> task::Poll<io::Result<()>> {
         let ready = Ready::readable();
 
-        let pollev = PollEvented::new(*self).unwrap();
+        let pollev = AsyncFd::new(self.fd).unwrap();
 
-        let res = ready!(pollev.poll_read_ready(cx, ready))
+        let res = ready!(pollev.poll_read_ready(cx))
             .map(|_mio_ready| ());
 
         println!("got ready");
@@ -75,15 +77,16 @@ impl EventLoopFd {
         // TODO: RUN LIBEVENT, or from caller?
     }
 
+    /*
     pub fn clear_read_ready(
         &self,
         cx: &mut task::Context<'_>,
     ) -> io::Result<()> {
-        let ready = Ready::readable();
-        let pollev = PollEvented::new(*self).unwrap();
+        let pollev = AsyncFd::new(self.fd).unwrap();
         pollev.clear_read_ready(cx, ready)
             .map(|_mio_ready| ())
     }
+    */
 }
 
 fn to_timeval(duration: Duration) -> libevent_sys::timeval {
@@ -105,20 +108,20 @@ fn to_timeval(duration: Duration) -> libevent_sys::timeval {
 }
 
 pub struct TokioLibevent {
-    inner: libevent::Libevent,
+    inner: libevent::Base,
     evfd: EventLoopFd,
 }
 
 impl TokioLibevent {
     pub fn new() -> Result<Self, io::Error> {
-        let inner = libevent::Libevent::new()?;
+        let inner = libevent::Base::new()?;
 
 
         let evfd = {
 
             let fd = unsafe {
-                let base = inner.base().as_inner();
-                evhack::base_fd(base)
+                let base = inner.as_raw();
+                evhack::base_fd(base.as_ref())
             };
 
             // Provide some sanity checking on our insane cast
@@ -135,11 +138,11 @@ impl TokioLibevent {
         })
     }
 
-    pub fn inner(&self) -> &libevent::Libevent {
+    pub fn inner(&self) -> &libevent::Base {
         &self.inner
     }
 
-    pub fn inner_mut(&mut self) -> &mut libevent::Libevent {
+    pub fn inner_mut(&mut self) -> &mut libevent::Base {
         &mut self.inner
     }
 

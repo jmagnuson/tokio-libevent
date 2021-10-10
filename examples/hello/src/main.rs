@@ -3,6 +3,7 @@ use futures::future::{TryFutureExt, FutureExt};
 //use futures_util::future::try_future::TryFutureExt;
 use tokio_libevent::{TokioLibevent};
 use std::time::Duration;
+use std::sync::{Arc, Mutex};
 
 mod ffi;
 
@@ -15,18 +16,22 @@ fn main() {
     let libevent = TokioLibevent::new()
         .unwrap_or_else(|e| panic!("{:?}", e));
 
-    let _ = unsafe { libevent.inner().with_base(|base| {
-        ffi::helloc_init(base)
-    })};
+    let _ = unsafe {
+        ffi::helloc_init(libevent.inner().as_raw().as_mut())
+    };
 
     //let ughh = libevent.as_fd().fd;
-    let ughh = unsafe { libevent.inner().base().as_inner_mut() };
+    let ughh = unsafe { libevent.inner().as_raw().as_mut() };
 
-    let mut rt = Builder::new()
-        .basic_scheduler()
+    let libevent = Arc::new(Mutex::new(libevent));
+
+    let mut rt = Builder::new_current_thread()
+        //.basic_scheduler()
         .enable_all()
         .with_park(move |maybe_duration| {
-            let libevent_ref = libevent.inner();
+            let libevent_guard = libevent.lock().unwrap();
+            let libevent_ref = libevent_guard.inner();
+
             let new_duration = if let Some(duration) = maybe_duration {
                 let now = std::time::Instant::now();
                 //libevent_ref.run_timeout(duration);
@@ -59,7 +64,7 @@ fn main() {
         loop {
             //libevent_ref.turn_once(Duration::from_millis(10)).await.unwrap();
             println!("hi from tokio");
-            tokio::time::delay_for(Duration::from_secs(5)).await;
+            tokio::time::sleep(Duration::from_secs(5)).await;
             //tokio::task::yield_now().await;
         }
     }.map(|_| ());
